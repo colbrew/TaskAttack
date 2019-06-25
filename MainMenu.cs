@@ -5,32 +5,36 @@ using UnityEngine.iOS;
 
 public class MainMenu : MonoBehaviour {
 
-    public Sprite questionMark;
-    public Sprite[] buttons;
-    public GameObject[] checkMarks;
-    public GameObject[] LevelImage;
-    public DifficultyLevel difficultyLevel;
-    public Dropdown dropdown;
-    int numberOfStartButtons = 6;
-    public GameObject unlockBox;
-    public GameObject infinitePlayButton;
-    public GameObject leaderboardButton;
-    public GameObject difficultyButton;
-    public GameObject resetButton;
-    public AudioSource menuNoIntro;
-    float startVolume;
-    Text unlockText;
-    Color infiniteColor;
-    Color difficultyColor;
-    float flashTime = 0;
-    float flashSpeed = 3;
-    float flashDuration = 2.25f;
-    bool fadeAndLoad = false;
-    float fadeStart;
-    public float fadeSpeed = .5f;
-    CanvasGroup menuCanvas;
-    public AudioSource buttonClick;
-    bool reviewRequested = false;
+    [Header("Set in Inspector")]
+    [SerializeField] private GameObject[] checkMarks;
+    [Tooltip("Insert the images that appear in the main menu after you beat each level.")]
+    [SerializeField] private GameObject[] LevelImage;
+    [SerializeField] private DifficultyLevel difficultyLevel;
+    [Tooltip("Insert the difficulty level dropdown.")]
+    [SerializeField] private Dropdown dropdown;
+    [Tooltip("Insert the 'beat X to unlock' sign")]
+    [SerializeField] private GameObject unlockBox;
+    [SerializeField] private GameObject infinitePlayButton;
+    [SerializeField] private GameObject leaderboardButton;
+    [Tooltip("Insert the difficulty level Label - used to flash newly unlocked difficulties.")]
+    [SerializeField] private GameObject difficultyButton;
+    [SerializeField] private GameObject resetButton;
+    [SerializeField] private AudioSource mainMenuMusic;
+    [SerializeField] private AudioSource buttonClick;
+
+    private int numberOfStartButtons = 6;
+    private float startVolume;
+    private Text unlockText;
+    private Color infiniteColor;
+    private Color difficultyColor;
+    private float flashTime = 0;
+    private float flashSpeed = 3;
+    private float flashDuration = 2.25f;
+    private bool fadeAndLoad = false;
+    private float fadeStart;
+    private float fadeSpeed = .5f;
+    private CanvasGroup menuCanvas;
+    private bool reviewRequested = false;
 
     private void Awake()
     {
@@ -52,8 +56,7 @@ public class MainMenu : MonoBehaviour {
         dropdown = GetComponentInChildren<Dropdown>();
         unlockText = unlockBox.GetComponentInChildren<Text>();
         menuCanvas = GetComponent<CanvasGroup>();
-        startVolume = GetComponent<AudioSource>().volume;
-       
+        startVolume = GetComponent<AudioSource>().volume; 
     }
 
     // Use this for initialization
@@ -67,7 +70,7 @@ public class MainMenu : MonoBehaviour {
         }
         UpdateButtons();
 
-        menuNoIntro.Play();
+        mainMenuMusic.Play();
 
         Social.localUser.Authenticate(ProcessAuthentication); // activate Leaderboard if signed into Game Center
     }
@@ -130,7 +133,7 @@ public class MainMenu : MonoBehaviour {
         {
             float u = (Time.time - fadeStart) / fadeSpeed;
             menuCanvas.alpha = Mathf.Lerp(1, 0, u);
-            menuNoIntro.volume = Mathf.Lerp(startVolume, 0, u);
+            mainMenuMusic.volume = Mathf.Lerp(startVolume, 0, u);
             if(u > .99f)
             {
                 Invoke("DelayedLoad", .8f);

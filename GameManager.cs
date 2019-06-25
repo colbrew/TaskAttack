@@ -6,54 +6,63 @@ using UnityEngine.Audio;
 // using UnityEngine.Monetization;
 
 public class GameManager : MonoBehaviour {
-    static public GameManager S;
-    static Dictionary<WeaponType, WeaponDefinition> WEAP_DICT;
+    public static GameManager S;
+    public static DataController dataController;
+    public static Image powerUpIcon;
+    private static Dictionary<WeaponType, WeaponDefinition> WEAPON_DICT;
+
+    [Header("Prototype / Testing mode")]
+    [Tooltip("Prototype Mode allows start from any level.")]
+    [SerializeField] private bool prototypeMode = false;
+    [Tooltip("Start Level for Prototype Mode.")]
+    [SerializeField] private int startFromLevel = 0;
 
     [Header("Set in Inspector")]
-    public bool prototypeMode = false;
-    public int startFromLevel = 0;// if in Prototype Mode, and this is set higher than 1, the level will start
-    public WeaponDefinition[] weaponDefinitions;
-    public GameObject prefabPowerUp;
-    public WeaponType[] powerUpFrequency = new WeaponType[] { WeaponType.spread };
-    public GameObject[] enemies;
-    public GameObject[] Levels;
-    public float gameRestartDelay = 3;
-    public GameObject blurScreen;
     public DifficultyLevel difficulty;
+    public GameObject pauseButton;
+    [Space(10)]
+    public AudioMixer masterMixer;
     public AudioSource gameplayNoIntro;
     public AudioSource gameplayWIntro;
     public AudioSource bossMusic;
-    public GameObject instructions;
-    public GameObject pauseButton;
-    public GameObject hardDance;
-    public GameObject finalDance;
-    public AudioMixer masterMixer;
-    
+    [Space(10)]
+    [SerializeField] private WeaponDefinition[] weaponDefinitions;
+    [SerializeField] private GameObject prefabPowerUp;
+    [SerializeField] private WeaponType[] powerUpFrequency = new WeaponType[] { WeaponType.spread };
+    [Tooltip("Insert game level prefabs in order, with Infinite play level being last")]
+    [SerializeField] private GameObject[] Levels;
+    [SerializeField] private float gameRestartDelay = 3;
+    [Tooltip("Insert the blur screen prefab.")]
+    [SerializeField] private GameObject blurScreen;  
+    [Tooltip("Insert the instructions prefab.")]
+    [SerializeField] private GameObject instructions;
+    [Tooltip("Insert the prefab for the dance when you beat game at Hard.")]
+    [SerializeField] private GameObject hardDance;
+    [Tooltip("Insert the prefab for the dance when you beat game at Master.")]
+    [SerializeField] private GameObject masterDance;
 
-    [Header("Set Dynamically")]
-    public string[] texts;
-    public int nextLevel = 0;
-    public static Text levelText;
-    public static Text scoreText;
-    public static Text highScore;
-    Text highScoreTitle;
-    public static Text powerUpCounter;
-    public static Image powerUpIcon;
-    float levelPUChance = 1;
-    public bool bringBackCheer = false; // bool for returning cheer text after a pause but before next level starts
+    [Header("Set Dynamically")]    
+    [SerializeField] private string[] texts;
+    [SerializeField] private int nextLevel = 0;
+    [SerializeField] private float levelPUChance = 1;
+    [SerializeField] private bool bringBackCheer = false; // bool for returning cheer text after a pause but before next level starts
+    [SerializeField] private TextMessageNotification textMessageNotification;
+    [SerializeField] private int score = 0;
+    private Text highScoreTitle;
+    private Text scoreText;
+    private Text highScore;
 
-    public int score = 0;
-    public bool infinitePlay = false;
-
-    public TextMessageNotification textMessageNotification;
-    public DataController dataController;
-
-    public static Transform AUDIO_ANCHOR;
-
+    public float GameRestartDelay { get => gameRestartDelay; private set => gameRestartDelay = value; }
+    public int NextLevel { get => nextLevel; set => nextLevel = value; }
+    public bool BringBackCheer { get => bringBackCheer; private set => bringBackCheer = value; }
+    public bool InfinitePlay { get; set; } = false;
+    public Text LevelText { get; set; }
+    public Text PowerUpCounter { get; set; }
 
     // Use this for initialization
     void Awake()
-    {
+    {   
+        // singleton
         if (S == null)
         {
             S = this;
@@ -79,21 +88,21 @@ public class GameManager : MonoBehaviour {
 
         // initialize variables
         textMessageNotification = GetComponent<TextMessageNotification>();
-        levelText = GameObject.Find("CenterBillboard").GetComponent<Text>();
+        LevelText = GameObject.Find("CenterBillboard").GetComponent<Text>();
         scoreText = GameObject.Find("Score").GetComponent<Text>();
         scoreText.fontSize = 20; // reset to 20 in case player scored over 1 million and shrunk text
         highScore = GameObject.Find("HighScore").GetComponent<Text>();
         highScoreTitle = GameObject.Find("HighScoreTitle").GetComponent<Text>();
-        powerUpCounter = GameObject.Find("PowerUpCounter").GetComponent<Text>();
-        powerUpCounter.text = "";
+        PowerUpCounter = GameObject.Find("PowerUpCounter").GetComponent<Text>();
+        PowerUpCounter.text = "";
         powerUpIcon = GameObject.Find("PowerUpIcon").GetComponent<Image>();
         powerUpIcon.enabled = !powerUpIcon.enabled;
 
         // a generic Dictionary with WeaponType as key
-        WEAP_DICT = new Dictionary<WeaponType, WeaponDefinition>();
+        WEAPON_DICT = new Dictionary<WeaponType, WeaponDefinition>();
         foreach (WeaponDefinition def in weaponDefinitions)
         {
-            WEAP_DICT[def.type] = def;
+            WEAPON_DICT[def.type] = def;
         }
 
         // set score to 0
@@ -105,7 +114,7 @@ public class GameManager : MonoBehaviour {
         // using PlayerPrefs for setup to avoid race condition where we miss nextLevel setup (moved that to Start())
         if (PlayerPrefs.GetInt("startLevel") == 6)
         {
-            infinitePlay = true;
+            InfinitePlay = true;
         }
         else // if not infinite play, turn off Wave Counter
         {
@@ -127,14 +136,14 @@ public class GameManager : MonoBehaviour {
     private void Start()
     {
         // set start level and high score
-        nextLevel = dataController.StartLevel();
+        NextLevel = dataController.StartLevel();
         highScore.text = dataController.GetHighestPlayerScore().ToString();
 
         // Start Game - decide how to start (if prototypeMode and level 0, do not start game at all)
         if (prototypeMode && startFromLevel > 0)
         {
             PlayerPrefs.SetInt("startLevel", startFromLevel);
-            nextLevel = dataController.StartLevel();
+            NextLevel = dataController.StartLevel();
             TextInterlude();
             PlayerPrefs.SetInt("startLevel", 0);
         }
@@ -154,8 +163,8 @@ public class GameManager : MonoBehaviour {
     public void TextInterlude()
     {
         textMessageNotification.StartNotification();
-        TaskAttackAnalytics.StartedLevel(nextLevel, difficulty.difficulty);
-        bringBackCheer = true;
+        TaskAttackAnalytics.StartedLevel(NextLevel, difficulty.difficulty);
+        BringBackCheer = true;
     }
 
     public void StartNextLevel()
@@ -170,7 +179,7 @@ public class GameManager : MonoBehaviour {
             Player.S.gameObject.SetActive(true);
         }
 
-        if (nextLevel == Levels.Length - 1 && !infinitePlay) // check if at end of regular levels
+        if (NextLevel == Levels.Length - 1 && !InfinitePlay) // check if at end of regular levels
         {
             DelayedRestart(3);
         }
@@ -182,9 +191,9 @@ public class GameManager : MonoBehaviour {
 
     void DelayedLevelStart()
     {
-        bringBackCheer = false;
-        levelText.text = "";
-        GameObject go = Instantiate(Levels[nextLevel]);
+        BringBackCheer = false;
+        LevelText.text = "";
+        GameObject go = Instantiate(Levels[NextLevel]);
         levelPUChance = go.GetComponent<LevelManager>().levelPowerupChance;
         // nextLevel++; we moved this to the celebration script
     }
@@ -215,8 +224,8 @@ public class GameManager : MonoBehaviour {
 
     static public WeaponDefinition GetWeaponDefinition(WeaponType wt)
     {
-        if (WEAP_DICT.ContainsKey(wt))
-            return (WEAP_DICT[wt]);
+        if (WEAPON_DICT.ContainsKey(wt))
+            return (WEAPON_DICT[wt]);
 
         // if key not found, return empty
         return (new WeaponDefinition());
@@ -224,17 +233,17 @@ public class GameManager : MonoBehaviour {
 
     public void DelayedRestart(float delay)
     {
-        if (!infinitePlay)
+        if (!InfinitePlay)
         {
-            dataController.SetHighestLevel(nextLevel);
+            dataController.SetHighestLevel(NextLevel);
 
-            if (nextLevel == (Levels.Length - 1)) // if player has reached the end of the levels for a certain difficulty, we show a variation of "You Win" message
+            if (NextLevel == (Levels.Length - 1)) // if player has reached the end of the levels for a certain difficulty, we show a variation of "You Win" message
             {
                 if (difficulty.difficulty == 3)
                 {
-                    levelText.text = "You Win!\n\n\nYou are\n\nthe\n\nTask MASTER!";
+                    LevelText.text = "You Win!\n\n\nYou are\n\nthe\n\nTask MASTER!";
                     Destroy(Player.S.gameObject);
-                    Instantiate(finalDance);
+                    Instantiate(masterDance);
                     PlayerPrefs.SetInt("ResetActive", 1); // turn on main menu reset button now that player has beat the entire game
                     PlayerPrefs.SetInt("BeatGame", 1); // used to trigger AskForReview() one last time.
                 }
@@ -243,7 +252,7 @@ public class GameManager : MonoBehaviour {
                     // We instantiate the alien dance partners in Celebration script to get timing right
                     if (PlayerPrefs.GetInt("TaskMasterUnlocked") != 1)
                     {
-                        levelText.text = "You Win!\n\n\nTask Master unlocked";
+                        LevelText.text = "You Win!\n\n\nTask Master unlocked";
                         Destroy(Player.S.gameObject);
                         Instantiate(hardDance);
                         PlayerPrefs.SetInt("TaskMasterUnlocked", 1);
@@ -251,32 +260,32 @@ public class GameManager : MonoBehaviour {
                     }
                     else
                     {
-                        levelText.text = "You Win!";
+                        LevelText.text = "You Win!";
                     }
                 }
                 else if (difficulty.difficulty == 1)
                 {
                     if (PlayerPrefs.GetInt("HardUnlocked") != 1)
                     {
-                        levelText.text = "You Win!\n\n\nHard unlocked\n\n+\n\nInfinite play unlocked";
+                        LevelText.text = "You Win!\n\n\nHard unlocked\n\n+\n\nInfinite play unlocked";
                         PlayerPrefs.SetInt("HardUnlocked", 1);
                         PlayerPrefs.SetInt("FirstTimeInfinite", 1);
                     }
                     else
                     {
-                        levelText.text = "You Win!";
+                        LevelText.text = "You Win!";
                     }
                 }
                 else if (difficulty.difficulty == 0)
                 {
                     if (PlayerPrefs.GetInt("BeatEasy") != 2)
                     {
-                        levelText.text = "You Win!\n\n\nAre you ready for Normal?";
+                        LevelText.text = "You Win!\n\n\nAre you ready for Normal?";
                         PlayerPrefs.SetInt("BeatEasy", 1);
                     }
                     else
                     {
-                        levelText.text = "You Win!";
+                        LevelText.text = "You Win!";
                     }
                 }
 
@@ -288,24 +297,24 @@ public class GameManager : MonoBehaviour {
             }
             else
             {
-                levelText.text = "Game Over\n\nBack to Reality";
+                LevelText.text = "Game Over\n\nBack to Reality";
             }
         }
         else
         {
             if (score > PlayerPrefs.GetInt("highestInfiniteScore"))
             {
-                levelText.text = "New High Score!\n\n" + score.ToString();
+                LevelText.text = "New High Score!\n\n" + score.ToString();
             }
             else
             {
-                levelText.text = "Even infinity has a deadline.";
+                LevelText.text = "Even infinity has a deadline.";
             }
         }
 
         dataController.SubmitNewPlayerScore(score);
 
-        if (difficulty.difficulty == 4 && !infinitePlay) // if final level of the entire game, 67 second pause before return to main menu
+        if (difficulty.difficulty == 4 && !InfinitePlay) // if final level of the entire game, 67 second pause before return to main menu
         {
             difficulty.difficulty = 3;
             Invoke("BackToMainMenu", 67f);
@@ -320,4 +329,11 @@ public class GameManager : MonoBehaviour {
     {
         SceneManager.LoadScene("MainMenu");
     }
+
+    public int GetGameLevelsLength()
+    {
+        return Levels.Length;
+    }
 }
+
+

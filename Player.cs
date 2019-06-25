@@ -3,94 +3,55 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-// collider on Player must not be set to Trigger in order for particle collision to work
+// collider on Player must not be set to Trigger in order for particle collisions to work
 public class Player : MonoBehaviour {
 
     public static Player S;
     public static Vector3 PLAYERSTARTLOCATION = new Vector3(0, -3, 0);
 
     [Header("Set in Inspector")]
-    public Sprite regularSprite;
-    public int extraLives;
-    public AudioData explosionSound;
-    public GameObject explosionAnim; // player death animation
-    public float movingSpeed;
-    public float playerFingerOffset;
+    [Tooltip("Insert the player ship engines prefab here.")]
     public GameObject engines;
+    [Tooltip("Number of extra lives the player has.")]
+    [SerializeField] private int extraLives;
+    [Tooltip("Explosion sound when player dies.")]
+    [SerializeField] private AudioData explosionSound;
+    [Tooltip("Explosion when player dies.")]
+    [SerializeField] private GameObject explosionAnim;
+    [SerializeField] private float movingSpeed;
+    [SerializeField] private float playerFingerOffset;
+    [Tooltip("Flash speed when player spawns.")]
+    [SerializeField] private float flashSpeed = 3;
+    [Tooltip("Flash duration when player spawns.")]
+    [SerializeField] private float flashDuration = 2;
 
     [Header("Set Dynamically")]
-    Vector3 startPosition, fingerPosition;
-    public float currentFingerOffset;
-    public float startTime;
-    public Weapon weapon;
-    BoundaryCheck shipBnd;
-    private static bool paused = false;
     public bool celebration = false;
-    SpriteRenderer spriteRend;
-    private static bool autoFire = true;
-    bool playerDead;
-    public bool instructions = false;
-    SpriteRenderer[] engRends = new SpriteRenderer[2];
-
-    // powerup controls
-    public bool powerupOn = false;
-    public float powerupStart;
-    public float powerupLife;
-    public WeaponDefinition def;
-
-    // pause variables
-    public bool isTextInterlude = false;
-
-    // player spawn variables
-    Color color;
-    float flashSpeed = 3;
-    float flashDuration = 2;
     public bool playerStarting;
-    float flashTime;
+    public bool instructionsShowing = false;
+    [SerializeField] private Weapon weapon;
+    [SerializeField] private WeaponDefinition currentWeaponDef;
+    
+    public bool powerupOn = false;
+    private float powerupStart;
+    private float powerupLife;
+    private BoundaryCheck shipBnd;
+    private SpriteRenderer spriteRend;
+    private bool playerDead;
+    private SpriteRenderer[] engRends = new SpriteRenderer[2];
+    private Vector3 startPosition, fingerPosition;
+    private float currentFingerOffset;
+    private float startTime;
+    private Color engineColor;   
+    private float flashTime;
 
-    // declare a new delegate type WeaponFireDelegate
     public delegate void WeaponFireDelegate();
-    // Create a WeaponFireDelegate field named fireDelegate
     public WeaponFireDelegate fireDelegate;
 
-    public static bool Paused
-    {
-        get
-        {
-            return paused;
-        }
-
-        set
-        {
-            paused = value;
-        }
-    }
-
-    public static bool AutoFire
-    {
-        get
-        {
-            return autoFire;
-        }
-
-        set
-        {
-            autoFire = value;
-        }
-    }
-
-    public int ExtraLives
-    {
-        get
-        {
-            return extraLives;
-        }
-
-        set
-        {
-            extraLives = value;
-        }
-    }
+    public static bool Paused { get; set; } = false;
+    public static bool AutoFire { get; set; } = true;
+    public bool IsTextInterlude { get; set; } = false;
+    public int ExtraLives { get { return extraLives; } set { extraLives = value; }}
 
     private void Awake()
     {
@@ -114,7 +75,7 @@ public class Player : MonoBehaviour {
 
         spriteRend = GetComponent<SpriteRenderer>();
         engRends = engines.GetComponentsInChildren<SpriteRenderer>();
-        color = spriteRend.color;
+        engineColor = spriteRend.color;
 
         ExtraLives = 2;
     }
@@ -122,7 +83,7 @@ public class Player : MonoBehaviour {
     private void Start()
     {
         weapon.Type = WeaponType.blaster;
-        if (!instructions)
+        if (!instructionsShowing)
         {
             Respawn();
         }
@@ -141,14 +102,14 @@ public class Player : MonoBehaviour {
             // make player flash
             flashTime += Time.deltaTime;
             float u = Mathf.Abs(Mathf.Sin(flashTime * flashSpeed));
-            color.a = Mathf.Lerp(0, 1, u);
-            spriteRend.color = engRends[0].color = engRends[1].color = color;
+            engineColor.a = Mathf.Lerp(0, 1, u);
+            spriteRend.color = engRends[0].color = engRends[1].color = engineColor;
 
             // if flash time is up and alpha is near 1, back to normal
-            if (flashTime > flashDuration && color.a > .95f)
+            if (flashTime > flashDuration && engineColor.a > .95f)
             {
-                color.a = 1;
-                spriteRend.color = engRends[0].color = engRends[1].color = color;
+                engineColor.a = 1;
+                spriteRend.color = engRends[0].color = engRends[1].color = engineColor;
                 playerStarting = false;
                 flashTime = 0;
             }
@@ -161,11 +122,11 @@ public class Player : MonoBehaviour {
 
         if(Paused)
         {
-            if(playerDead || celebration || instructions)
+            if(playerDead || celebration || instructionsShowing)
             {
                 return;	
             }
-            else if (isTextInterlude) // if this is a pause due to a text interlude
+            else if (IsTextInterlude) // if this is a pause due to a text interlude
             {
                 if (Input.touchCount > 0)
                 {
@@ -227,10 +188,10 @@ public class Player : MonoBehaviour {
         if (powerupOn)
         {
             // update powerup countdown text
-            GameManager.powerUpCounter.text = Mathf.CeilToInt((powerupLife - (Time.time - powerupStart))).ToString();
+            GameManager.S.PowerUpCounter.text = Mathf.CeilToInt((powerupLife - (Time.time - powerupStart))).ToString();
 
             // check for end of powerup lifetime or text interlude, then reset to blaster
-            if (Time.time - powerupStart > powerupLife || isTextInterlude)
+            if (Time.time - powerupStart > powerupLife || IsTextInterlude)
             {
                 TurnOffPowerUp();
             }
@@ -251,14 +212,14 @@ public class Player : MonoBehaviour {
     {
         PowerUp pu = go.GetComponent<PowerUp>();
         weapon.Type = pu.type;
-        def = GameManager.GetWeaponDefinition(weapon.Type);
-        powerupLife = def.powerUpLife;
+        currentWeaponDef = GameManager.GetWeaponDefinition(weapon.Type);
+        powerupLife = currentWeaponDef.powerUpLife;
         powerupStart = Time.time;
         if (!powerupOn)
         {
             GameManager.powerUpIcon.enabled = !GameManager.powerUpIcon.enabled;
         }
-        GameManager.powerUpIcon.sprite = def.powerupSprite;
+        GameManager.powerUpIcon.sprite = currentWeaponDef.powerupSprite;
         powerupOn = true;
         pu.AbsorbedBy(this.gameObject);
     }
@@ -267,16 +228,16 @@ public class Player : MonoBehaviour {
     {
         weapon.Type = WeaponType.blaster;
         powerupOn = false;
-        GameManager.powerUpCounter.text = null;
+        GameManager.S.PowerUpCounter.text = null;
         GameManager.powerUpIcon.enabled = !GameManager.powerUpIcon.enabled;
     }
     
     public void LoseLife()
     {
         playerDead = true;
-        paused = true;
+        Paused = true;
         BlurScreen.S.UnBlur();
-        GameManager.levelText.text = null;
+        GameManager.S.LevelText.text = null;
 
         // explosion
         explosionSound.Play(transform);
@@ -287,7 +248,7 @@ public class Player : MonoBehaviour {
 
         if (ExtraLives <= 0)
         {
-            GameManager.S.DelayedRestart(GameManager.S.gameRestartDelay);
+            GameManager.S.DelayedRestart(GameManager.S.GameRestartDelay);
             Destroy(gameObject);
         }
         else if(ExtraLives > 0)
@@ -308,14 +269,14 @@ public class Player : MonoBehaviour {
 
     public void Respawn()
     {
-        color.a = 0;
-        spriteRend.color = engRends[0].color = engRends[1].color = color;
+        engineColor.a = 0;
+        spriteRend.color = engRends[0].color = engRends[1].color = engineColor;
         gameObject.SetActive(true);
         playerDead = false;
-        if (!isTextInterlude && !celebration)
+        if (!IsTextInterlude && !celebration)
         {
             transform.position = PLAYERSTARTLOCATION;
-            paused = false;
+            Paused = false;
         }
         playerStarting = true;
     }
